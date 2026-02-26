@@ -10,6 +10,13 @@ This app allows users to:
 
 ---
 
+
+## 📸 Application Screenshot
+
+![RAG App Screenshot](screenshot.png)
+
+---
+
 ## 🚀 Features
 
 - Drag & Drop file upload (PDF / TXT)
