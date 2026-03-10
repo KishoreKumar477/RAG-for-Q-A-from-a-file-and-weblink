@@ -72,7 +72,8 @@ pip install -r requirements.txt
 
 streamlit run rag_app.py
 
-#authored by 
+##authored by 
+
 kishore kumar
 
 
