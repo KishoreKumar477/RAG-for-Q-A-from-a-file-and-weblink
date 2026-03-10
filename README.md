@@ -71,3 +71,8 @@ pip install -r requirements.txt
 ▶️ Run the App
 
 streamlit run rag_app.py
+
+#authored by 
+kishore kumar
+
+
