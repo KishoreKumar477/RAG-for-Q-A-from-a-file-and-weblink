@@ -5,6 +5,8 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import WebBaseLoader
 from pypdf import PdfReader
 
+
+
 st.set_page_config(page_title="Simple RAG", layout="wide")
 st.title("Simple RAG - Document & Website Q&A")
 
