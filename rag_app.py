@@ -5,17 +5,20 @@ from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import WebBaseLoader
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain.chains import load_qa_chain
+from langchain.chains.combine_documents import create_stuff_documents_chain
+from langchain_core.prompts import ChatPromptTemplate
 from pypdf import PdfReader
 from dotenv import load_dotenv
 
 load_dotenv()
 os.environ["USER_AGENT"] = "RAGApp/1.0"
 
+if "GOOGLE_API_KEY" in st.secrets:
+    os.environ["GOOGLE_API_KEY"] = st.secrets["GOOGLE_API_KEY"]
+
 st.set_page_config(page_title="RAG App", layout="wide")
 st.title("📄 RAG: Q&A from Files & Links")
 
-# Helper Functions
 def get_pdf_text(pdf_docs):
     text = ""
     for pdf in pdf_docs:
@@ -24,14 +27,21 @@ def get_pdf_text(pdf_docs):
             text += page.extract_text()
     return text
 
-def get_conversational_chain():
+def get_answer(docs, question):
     model = ChatGoogleGenerativeAI(model="gemini-1.5-flash", temperature=0.3)
-    return load_qa_chain(model, chain_type="stuff")
+    prompt = ChatPromptTemplate.from_template("""
+Answer the question based on the context below.
+
+Context: {context}
+
+Question: {input}
+""")
+    chain = create_stuff_documents_chain(model, prompt)
+    return chain.invoke({"input": question, "context": docs})
 
 if "vectorstore" not in st.session_state:
     st.session_state.vectorstore = None
 
-# Sidebar
 with st.sidebar:
     st.header("Upload Sources")
     pdf_docs = st.file_uploader("PDFs", accept_multiple_files=True)
@@ -49,6 +59,7 @@ with st.sidebar:
                     raw_text += " ".join([d.page_content for d in web_docs])
                 except Exception as e:
                     st.warning(f"Could not load URL: {e}")
+            
             if raw_text:
                 text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
                 chunks = text_splitter.split_text(raw_text)
@@ -56,11 +67,9 @@ with st.sidebar:
                 st.session_state.vectorstore = FAISS.from_texts(chunks, embeddings)
                 st.success("Ready!")
 
-# Main UI
 if st.session_state.vectorstore:
     user_q = st.text_input("Ask a question:")
     if user_q:
         docs = st.session_state.vectorstore.similarity_search(user_q, k=3)
-        chain = get_conversational_chain()
-        response = chain.invoke({"input_documents": docs, "question": user_q})
-        st.write(response["output_text"])
+        response = get_answer(docs, user_q)
+        st.write(response)
