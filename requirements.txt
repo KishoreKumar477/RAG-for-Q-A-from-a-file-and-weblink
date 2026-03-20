@@ -1,25 +1,13 @@
 streamlit
 
 langchain==0.0.350
-
-langchain-community
-
-langchain-core
-
-langchain-google-genai
-
-langchain-huggingface
-
-langchain-text-splitters
-
-faiss-cpu
-
-sentence-transformers
-
-pypdf
-
-beautifulsoup4
-
-python-dotenv
+langchain-community==0.0.20
+langchain-google-genai==0.0.6
 
 google-generativeai
+
+faiss-cpu
+sentence-transformers
+pypdf
+beautifulsoup4
+python-dotenv
