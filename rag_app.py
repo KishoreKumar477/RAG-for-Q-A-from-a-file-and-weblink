@@ -11,6 +11,9 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+
+api_key = os.getenv("OPENAI_API_KEY")
+
 st.set_page_config(page_title="RAG App", layout="wide")
 st.title("📄 RAG: Q&A from Files & Links")
 
