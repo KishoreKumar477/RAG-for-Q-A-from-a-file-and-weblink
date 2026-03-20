@@ -41,7 +41,7 @@ with st.sidebar:
             raw_text = ""
             if pdf_docs:
                 raw_text += get_pdf_text(pdf_docs)
-           if url:
+            if url:
                 try:
                     loader = WebBaseLoader(url)
                     web_docs = loader.load()
