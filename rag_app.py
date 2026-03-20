@@ -3,12 +3,22 @@ from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import WebBaseLoader
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain.chains.question_answering import load_qa_chain
+
 from pypdf import PdfReader
 
 
 
 st.set_page_config(page_title="Simple RAG", layout="wide")
 st.title("Simple RAG - Document & Website Q&A")
+
+
+def get_conversational_chain():
+    # This uses the API key you'll set in Streamlit Secrets
+    model = ChatGoogleGenerativeAI(model="gemini-1.5-flash", temperature=0.3)
+    chain = load_qa_chain(model, chain_type="stuff")
+    return chain
 
 # --- Session state init ---
 if "vectorstore" not in st.session_state:
@@ -107,10 +117,22 @@ else:
     )
 
     if query:
-        with st.spinner("Searching..."):
+        with st.spinner("Thinking..."):
+            # 1. Get relevant documents
             docs = st.session_state.vectorstore.similarity_search(query, k=3)
-
-        st.subheader("Retrieved Context")
-        for i, doc in enumerate(docs, 1):
-            with st.expander(f"Chunk {i}", expanded=(i == 1)):
-                st.write(doc.page_content)
+            
+            # 2. Generate answer using Gemini
+            chain = get_conversational_chain()
+            response = chain.invoke(
+                {"input_documents": docs, "question": query}, 
+                return_only_outputs=True
+            )
+            
+            # 3. Display the answer
+            st.subheader("Answer")
+            st.write(response["output_text"])
+    
+            # 4. Show sources (optional)
+            with st.expander("View Source Chunks"):
+                for i, doc in enumerate(docs, 1):
+                    st.markdown(f"**Chunk {i}:** {doc.page_content}")
