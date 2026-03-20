@@ -111,11 +111,8 @@ with st.sidebar:
 if st.session_state.vectorstore is None:
     st.info("Upload a document or paste a website URL to begin.")
 else:
-    query = st.text_input(
-        "Ask a question",
-        placeholder="e.g. What is this content about?"
-    )
-
+    query = st.text_input("Ask a question", placeholder="e.g. What is this content about?")
+    
     if query:
         with st.spinner("Thinking..."):
             # 1. Get relevant documents
@@ -131,7 +128,7 @@ else:
             # 3. Display the answer
             st.subheader("Answer")
             st.write(response["output_text"])
-    
+            
             # 4. Show sources (optional)
             with st.expander("View Source Chunks"):
                 for i, doc in enumerate(docs, 1):
