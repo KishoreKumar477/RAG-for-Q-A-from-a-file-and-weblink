@@ -5,14 +5,11 @@ from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import WebBaseLoader
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain.chains import RetrievalQA
+from langchain.chains.question_answering import load_qa_chain
 from pypdf import PdfReader
 from dotenv import load_dotenv
 
 load_dotenv()
-
-
-api_key = os.getenv("GOOGLE_API_KEY")
 
 st.set_page_config(page_title="RAG App", layout="wide")
 st.title("📄 RAG: Q&A from Files & Links")
