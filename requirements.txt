@@ -21,3 +21,5 @@ pypdf
 beautifulsoup4
 
 python-dotenv
+
+google-generativeai
