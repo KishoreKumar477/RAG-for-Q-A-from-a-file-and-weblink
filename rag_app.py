@@ -41,11 +41,13 @@ with st.sidebar:
             raw_text = ""
             if pdf_docs:
                 raw_text += get_pdf_text(pdf_docs)
-            if url:
-                loader = WebBaseLoader(url)
-                web_docs = loader.load()
-                raw_text += " ".join([d.page_content for d in web_docs])
-            
+           if url:
+                try:
+                    loader = WebBaseLoader(url)
+                    web_docs = loader.load()
+                    raw_text += " ".join([d.page_content for d in web_docs])
+                except Exception as e:
+                    st.warning(f"Could not load URL: {e}")
             if raw_text:
                 text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
                 chunks = text_splitter.split_text(raw_text)
