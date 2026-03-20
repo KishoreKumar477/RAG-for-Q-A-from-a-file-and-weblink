@@ -1,135 +1,84 @@
 import streamlit as st
-from langchain_community.embeddings import HuggingFaceEmbeddings
+import os
 from langchain_community.vectorstores import FAISS
+from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import WebBaseLoader
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.chains.question_answering import load_qa_chain
-
 from pypdf import PdfReader
+from dotenv import load_dotenv
 
+load_dotenv()
 
+st.set_page_config(page_title="RAG Question Answerer", layout="wide")
+st.title("📄 RAG: Q&A from Files & Links")
 
-st.set_page_config(page_title="Simple RAG", layout="wide")
-st.title("Simple RAG - Document & Website Q&A")
+# --- Functions ---
+def get_pdf_text(pdf_docs):
+    text = ""
+    for pdf in pdf_docs:
+        pdf_reader = PdfReader(pdf)
+        for page in pdf_reader.pages:
+            content = page.extract_text()
+            if content:
+                text += content
+    return text
 
+def load_website(url):
+    loader = WebBaseLoader(url)
+    return loader.load()
 
 def get_conversational_chain():
-    # This uses the API key you'll set in Streamlit Secrets
+    # Looks for GOOGLE_API_KEY in Streamlit Secrets
     model = ChatGoogleGenerativeAI(model="gemini-1.5-flash", temperature=0.3)
     chain = load_qa_chain(model, chain_type="stuff")
     return chain
 
-# --- Session state init ---
+# --- Session State ---
 if "vectorstore" not in st.session_state:
     st.session_state.vectorstore = None
-if "source_name" not in st.session_state:
-    st.session_state.source_name = None
-
-# --- Helpers ---
-@st.cache_resource
-def load_embeddings():
-    return HuggingFaceEmbeddings(
-        model_name="sentence-transformers/all-MiniLM-L6-v2"
-    )
-
-def extract_text(uploaded_file):
-    if uploaded_file.type == "application/pdf":
-        reader = PdfReader(uploaded_file)
-        return "\n".join(page.extract_text() or "" for page in reader.pages)
-    return uploaded_file.read().decode("utf-8", errors="ignore")
-
-def load_website(url):
-    loader = WebBaseLoader(url)
-    documents = loader.load()
-    return documents
-
-def build_vectorstore_from_text(text, embeddings):
-    splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
-    chunks = splitter.split_text(text)
-    return FAISS.from_texts(chunks, embeddings), len(chunks)
-
-def build_vectorstore_from_docs(documents, embeddings):
-    splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
-    chunks = splitter.split_documents(documents)
-    return FAISS.from_documents(chunks, embeddings), len(chunks)
 
 # --- Sidebar ---
 with st.sidebar:
-    st.header("Choose Data Source")
-
-    option = st.radio(
-        "Select Source Type",
-        ["Upload Document (PDF/TXT)", "Paste Website URL"]
-    )
-
-    # ---- FILE UPLOAD ----
-    if option == "Upload Document (PDF/TXT)":
-        uploaded_file = st.file_uploader(
-            "Drag & Drop or Browse File",
-            type=["pdf", "txt"]
-        )
-
-        if uploaded_file:
-            if uploaded_file.name != st.session_state.source_name:
-                with st.spinner("Processing document..."):
-                    embeddings = load_embeddings()
-                    text = extract_text(uploaded_file)
-                    vs, n_chunks = build_vectorstore_from_text(text, embeddings)
-
-                    st.session_state.vectorstore = vs
-                    st.session_state.source_name = uploaded_file.name
-
-                st.success(f"Stored {n_chunks} chunks from {uploaded_file.name}")
-            else:
-                st.info(f"Loaded: {st.session_state.source_name}")
-
-    # ---- WEBSITE URL ----
-    if option == "Paste Website URL":
-        url = st.text_input("Enter Website URL")
-
-        if url:
-            if url != st.session_state.source_name:
-                with st.spinner("Fetching and processing website..."):
-                    embeddings = load_embeddings()
-                    documents = load_website(url)
-                    vs, n_chunks = build_vectorstore_from_docs(documents, embeddings)
-
-                    st.session_state.vectorstore = vs
-                    st.session_state.source_name = url
-
-                st.success(f"Stored {n_chunks} chunks from website")
-            else:
-                st.info(f"Loaded: {st.session_state.source_name}")
-
-    if st.session_state.vectorstore and st.button("Clear Data"):
-        st.session_state.vectorstore = None
-        st.session_state.source_name = None
-        st.rerun()
-
-# --- Main: Q&A ---
-if st.session_state.vectorstore is None:
-    st.info("Upload a document or paste a website URL to begin.")
-else:
-    query = st.text_input("Ask a question", placeholder="e.g. What is this content about?")
+    st.header("Data Sources")
+    pdf_docs = st.file_uploader("Upload PDFs", accept_multiple_files=True)
+    url = st.text_input("Or paste a Website URL")
     
-    if query:
-        with st.spinner("Thinking..."):
-            # 1. Get relevant documents
-            docs = st.session_state.vectorstore.similarity_search(query, k=3)
+    if st.button("Process Data"):
+        all_docs = []
+        with st.spinner("Processing..."):
+            # 1. Get text from PDFs
+            if pdf_docs:
+                raw_text = get_pdf_text(pdf_docs)
+                text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+                chunks = text_splitter.split_text(raw_text)
+                all_docs.extend(chunks)
             
-            # 2. Generate answer using Gemini
-            chain = get_conversational_chain()
-            response = chain.invoke(
-                {"input_documents": docs, "question": query}, 
-                return_only_outputs=True
-            )
-            
-            # 3. Display the answer
-            st.subheader("Answer")
-            st.write(response["output_text"])
-            
-            # 4. Show sources (optional)
-            with st.expander("View Source Chunks"):
-                for i, doc in enumerate(docs, 1):
-                    st.markdown(f"**Chunk {i}:** {doc.page_content}")
+            # 2. Get text from URL
+            if url:
+                web_docs = load_website(url)
+                text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+                web_chunks = text_splitter.split_documents(web_docs)
+                all_docs.extend([d.page_content for d in web_chunks])
+
+            if all_docs:
+                embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+                st.session_state.vectorstore = FAISS.from_texts(all_docs, embeddings)
+                st.success("Database Ready!")
+
+# --- Main UI ---
+if st.session_state.vectorstore:
+    user_question = st.text_input("Ask a question about your data:")
+    if user_question:
+        # Search the vector store
+        docs = st.session_state.vectorstore.similarity_search(user_question, k=3)
+        
+        # Generate Answer
+        chain = get_conversational_chain()
+        response = chain.invoke({"input_documents": docs, "question": user_question})
+        
+        st.subheader("Answer:")
+        st.write(response["output_text"])
+else:
+    st.info("Please upload a file or enter a URL and click 'Process Data' to start.")
