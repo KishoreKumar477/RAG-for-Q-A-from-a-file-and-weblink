@@ -68,6 +68,7 @@ source venv/bin/activate   # Mac/Linux
 Install Dependencies
 pip install -r requirements.txt
 ```
+
 ▶️ Run the App
 
 streamlit run rag_app.py
