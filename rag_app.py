@@ -185,7 +185,7 @@ if user_question and user_question.strip():
     with st.chat_message("assistant"):
         with st.spinner("Thinking..."):
             retrieved_docs = st.session_state.vectorstore.similarity_search(
-                user_question, k=4
+                user_question, k=3
             )
             answer = get_answer(retrieved_docs, user_question)
 
