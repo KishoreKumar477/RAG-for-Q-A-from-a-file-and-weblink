@@ -78,8 +78,8 @@ def extract_text_from_url(url: str) -> str:
 def build_vectorstore(raw_text: str):
     """Chunk text and build a FAISS vectorstore."""
     text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=1000,
-        chunk_overlap=200,
+        chunk_size=500,
+        chunk_overlap=50,
     )
     chunks = text_splitter.split_text(raw_text)
     embeddings = load_embeddings()
