@@ -17,8 +17,8 @@ from pypdf import PdfReader
 load_dotenv()
 os.environ["USER_AGENT"] = "RAGApp/1.0"
 
-if "GOOGLE_API_KEY" in st.secrets:
-    os.environ["GOOGLE_API_KEY"] = st.secrets["GOOGLE_API_KEY"]
+if "GROQ_API_KEY" in st.secrets:
+    os.environ["GROQ_API_KEY"] = st.secrets["GROQ_API_KEY"]
 
 # ── Page config ───────────────────────────────────────────────────────────────
 st.set_page_config(page_title="RAG Q&A App", page_icon="🧠", layout="wide")
