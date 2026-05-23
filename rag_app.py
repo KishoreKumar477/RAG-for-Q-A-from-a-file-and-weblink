@@ -34,7 +34,7 @@ def load_embeddings():
 @st.cache_resource
 def load_llm():
     return ChatGoogleGenerativeAI(
-        model="gemini-2.0-flash-lite",
+        model="gemini-2.0-flash",
         temperature=0.3,
     )
 
