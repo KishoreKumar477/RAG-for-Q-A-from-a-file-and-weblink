@@ -87,22 +87,27 @@ def build_vectorstore(raw_text: str):
 
 
 def get_answer(docs, question: str) -> str:
-    """Run the RAG chain and return the LLM answer."""
-    llm = load_llm()
-    prompt = ChatPromptTemplate.from_template(
-        """You are a helpful assistant. Answer the question based ONLY on the \
-context provided below. If the answer cannot be found in the context, respond \
-with: "I don't have enough information in the provided sources to answer this."
-
-Context:
-{context}
-
-Question: {input}
-
-Answer:"""
-    )
-    chain = create_stuff_documents_chain(llm, prompt)
-    return chain.invoke({"input": question, "context": docs})
+    try:
+        """Run the RAG chain and return the LLM answer."""
+        llm = load_llm()
+        prompt = ChatPromptTemplate.from_template(
+            """You are a helpful assistant. Answer the question based ONLY on the \
+    context provided below. If the answer cannot be found in the context, respond \
+    with: "I don't have enough information in the provided sources to answer this."
+    
+    Context:
+    {context}
+    
+    Question: {input}
+    
+    Answer:"""
+        )
+        chain = create_stuff_documents_chain(llm, prompt)
+        return chain.invoke({"input": question, "context": docs})
+    except Exception as e:
+        if "ResourceExhausted" in str(type(e).__name__):
+            return "⚠️ API rate limit reached. Please wait 60 seconds and try again."
+        return f"⚠️ An error occurred: {str(e)}"
 
 # ── Sidebar: source ingestion ─────────────────────────────────────────────────
 with st.sidebar:
