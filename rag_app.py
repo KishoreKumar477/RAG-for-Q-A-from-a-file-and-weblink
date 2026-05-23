@@ -1,5 +1,7 @@
 import os
+import time
 import streamlit as st
+from datetime import datetime
 from dotenv import load_dotenv
 from langchain_community.vectorstores import FAISS
 from langchain_huggingface import HuggingFaceEmbeddings
@@ -9,10 +11,9 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain_core.prompts import ChatPromptTemplate
 from pypdf import PdfReader
-from datetime import datetime
 
-# ── Environment setup ────────────────────────────────────────────────────────
-load_dotenv()  # works locally with a .env file
+# ── Environment setup ─────────────────────────────────────────────────────────
+load_dotenv()
 os.environ["USER_AGENT"] = "RAGApp/1.0"
 
 if "GOOGLE_API_KEY" in st.secrets:
@@ -23,17 +24,15 @@ st.set_page_config(page_title="RAG Q&A App", page_icon="🧠", layout="wide")
 st.title("🧠 RAG: Q&A from Files & Web Links")
 st.caption("Upload PDFs / TXT files or paste a URL, then ask questions about the content.")
 
-# ── Cached resources (loaded once, reused across reruns) ─────────────────────
+# ── Cached resources ──────────────────────────────────────────────────────────
 @st.cache_resource
 def load_embeddings():
-    """Load HuggingFace embedding model once and cache it."""
     return HuggingFaceEmbeddings(
         model_name="sentence-transformers/all-MiniLM-L6-v2"
     )
 
 @st.cache_resource
 def load_llm():
-    """Load Gemini LLM once and cache it."""
     return ChatGoogleGenerativeAI(
         model="gemini-2.0-flash",
         temperature=0.3,
@@ -47,7 +46,6 @@ if "chat_history" not in st.session_state:
 
 # ── Helper functions ──────────────────────────────────────────────────────────
 def extract_text_from_files(uploaded_files) -> str:
-    """Extract text from uploaded PDF and TXT files."""
     text = ""
     for file in uploaded_files:
         if file.name.lower().endswith(".txt"):
@@ -70,14 +68,12 @@ def extract_text_from_files(uploaded_files) -> str:
 
 
 def extract_text_from_url(url: str) -> str:
-    """Scrape and return text content from a URL."""
     loader = WebBaseLoader(url)
     web_docs = loader.load()
     return " ".join(d.page_content for d in web_docs)
 
 
 def build_vectorstore(raw_text: str):
-    """Chunk text and build a FAISS vectorstore."""
     text_splitter = RecursiveCharacterTextSplitter(
         chunk_size=500,
         chunk_overlap=50,
@@ -88,29 +84,35 @@ def build_vectorstore(raw_text: str):
 
 
 def get_answer(docs, question: str) -> str:
+    llm = load_llm()
+    prompt = ChatPromptTemplate.from_template(
+        """You are a helpful assistant. Answer the question based ONLY on the \
+context provided below. If the answer cannot be found in the context, respond \
+with: "I don't have enough information in the provided sources to answer this."
+
+Context:
+{context}
+
+Question: {input}
+
+Answer:"""
+    )
+    chain = create_stuff_documents_chain(llm, prompt)
     try:
-        """Run the RAG chain and return the LLM answer."""
-        llm = load_llm()
-        prompt = ChatPromptTemplate.from_template(
-            """You are a helpful assistant. Answer the question based ONLY on the \
-    context provided below. If the answer cannot be found in the context, respond \
-    with: "I don't have enough information in the provided sources to answer this."
-    
-    Context:
-    {context}
-    
-    Question: {input}
-    
-    Answer:"""
-        )
-        chain = create_stuff_documents_chain(llm, prompt)
         return chain.invoke({"input": question, "context": docs})
     except Exception as e:
-        if "ResourceExhausted" in str(type(e).__name__):
-            return "⚠️ API rate limit reached. Please wait 60 seconds and try again."
-        return f"⚠️ An error occurred: {str(e)}"
+        error_str = str(type(e).__name__) + str(e)
+        if "ResourceExhausted" in error_str or "429" in error_str:
+            # wait 15s and retry once
+            time.sleep(15)
+            try:
+                return chain.invoke({"input": question, "context": docs})
+            except Exception:
+                return "⚠️ API rate limit reached. Please wait 60 seconds and try again."
+        return f"⚠️ Error: {str(e)}"
 
-# ── Sidebar: source ingestion ─────────────────────────────────────────────────
+
+# ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.header("📂 Add Your Sources")
 
@@ -122,10 +124,8 @@ with st.sidebar:
     url = st.text_input("Or paste a Website URL", placeholder="https://example.com")
 
     col1, col2 = st.columns(2)
-
     with col1:
         process_clicked = st.button("⚙️ Process", use_container_width=True)
-
     with col2:
         if st.button("🗑️ Clear All", use_container_width=True):
             st.session_state.vectorstore = None
@@ -134,11 +134,9 @@ with st.sidebar:
 
     if process_clicked:
         raw_text = ""
-
         with st.spinner("Reading sources..."):
             if uploaded_files:
                 raw_text += extract_text_from_files(uploaded_files)
-
             if url:
                 try:
                     raw_text += extract_text_from_url(url)
@@ -148,19 +146,18 @@ with st.sidebar:
         if raw_text.strip():
             with st.spinner("Building vector index..."):
                 st.session_state.vectorstore = build_vectorstore(raw_text)
-                st.session_state.chat_history = []  # reset chat on new source
+                st.session_state.chat_history = []
             st.success(f"✅ Ready! Indexed {len(raw_text):,} characters.")
         else:
             st.warning("No content found. Please upload a file or enter a valid URL.")
 
-    # Status indicator
     st.divider()
     if st.session_state.vectorstore:
         st.success("🟢 Vector store is active")
     else:
         st.info("⚪ No sources loaded yet")
 
-# ── Main area: chat interface ─────────────────────────────────────────────────
+# ── Main chat area ────────────────────────────────────────────────────────────
 if not st.session_state.vectorstore:
     st.info("👈 Upload a file or enter a URL in the sidebar, then click **Process** to get started.")
     st.stop()
@@ -169,6 +166,7 @@ if not st.session_state.vectorstore:
 for entry in st.session_state.chat_history:
     with st.chat_message("user"):
         st.write(entry["question"])
+        st.caption(f"🕐 {entry.get('time', '')}")
     with st.chat_message("assistant"):
         st.write(entry["answer"])
         with st.expander("📚 Source chunks used"):
@@ -180,9 +178,11 @@ for entry in st.session_state.chat_history:
 user_question = st.chat_input("Ask a question about your documents...")
 
 if user_question and user_question.strip():
+    asked_at = datetime.now().strftime("%I:%M %p")
+
     with st.chat_message("user"):
         st.write(user_question)
-        st.caption(datetime.now().strftime("%I:%M %p"))
+        st.caption(f"🕐 {asked_at}")
 
     with st.chat_message("assistant"):
         with st.spinner("Thinking..."):
@@ -201,21 +201,9 @@ if user_question and user_question.strip():
                     + ("..." if len(doc.page_content) > 400 else "")
                 )
 
-    # Save to history
     st.session_state.chat_history.append({
         "question": user_question,
         "answer": answer,
         "source_chunks": [doc.page_content for doc in retrieved_docs],
-        "time": datetime.now().strftime("%I:%M %p"),  # e.g. "02:47 PM"
+        "time": asked_at,
     })
-    
-for entry in st.session_state.chat_history:
-    with st.chat_message("user"):
-        st.write(entry["question"])
-        st.caption(entry.get("time", ""))   # ← add this line
-    with st.chat_message("assistant"):
-        st.write(entry["answer"])
-        with st.expander("📚 Source chunks used"):
-            for i, chunk in enumerate(entry["source_chunks"]):
-                st.markdown(f"**Chunk {i + 1}:**")
-                st.caption(chunk[:400] + ("..." if len(chunk) > 400 else ""))
