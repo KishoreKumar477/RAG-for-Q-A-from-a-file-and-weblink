@@ -1,6 +1,7 @@
 import os
 import time
 import streamlit as st
+import pytz
 from datetime import datetime
 from dotenv import load_dotenv
 from langchain_community.vectorstores import FAISS
@@ -179,7 +180,8 @@ for entry in st.session_state.chat_history:
 user_question = st.chat_input("Ask a question about your documents...")
 
 if user_question and user_question.strip():
-    asked_at = datetime.now().strftime("%I:%M %p")
+    ist = pytz.timezone("Asia/Kolkata")
+    asked_at = datetime.now(ist).strftime("%I:%M %p")
 
     with st.chat_message("user"):
         st.write(user_question)
