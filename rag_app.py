@@ -8,6 +8,7 @@ from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import WebBaseLoader
 from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_groq import ChatGroq
 from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain_core.prompts import ChatPromptTemplate
 from pypdf import PdfReader
@@ -33,11 +34,11 @@ def load_embeddings():
 
 @st.cache_resource
 def load_llm():
-    return ChatGoogleGenerativeAI(
-        model="gemini-2.0-flash",
+    return ChatGroq(
+        model="llama-3.1-8b-instant",  # free, fast
         temperature=0.3,
+        api_key=st.secrets["GROQ_API_KEY"],
     )
-
 # ── Session state init ────────────────────────────────────────────────────────
 if "vectorstore" not in st.session_state:
     st.session_state.vectorstore = None
