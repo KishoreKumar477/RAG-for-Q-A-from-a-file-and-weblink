@@ -34,7 +34,7 @@ def load_embeddings():
 def load_llm():
     """Load Gemini LLM once and cache it."""
     return ChatGoogleGenerativeAI(
-        model="gemini-1.5-flash",
+        model="gemini-2.0-flash",
         temperature=0.3,
     )
 
