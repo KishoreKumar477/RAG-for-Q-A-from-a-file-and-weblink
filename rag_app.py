@@ -9,6 +9,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain_core.prompts import ChatPromptTemplate
 from pypdf import PdfReader
+from datetime import datetime
 
 # ── Environment setup ────────────────────────────────────────────────────────
 load_dotenv()  # works locally with a .env file
@@ -181,6 +182,7 @@ user_question = st.chat_input("Ask a question about your documents...")
 if user_question and user_question.strip():
     with st.chat_message("user"):
         st.write(user_question)
+        st.caption(datetime.now().strftime("%I:%M %p"))
 
     with st.chat_message("assistant"):
         with st.spinner("Thinking..."):
@@ -204,4 +206,16 @@ if user_question and user_question.strip():
         "question": user_question,
         "answer": answer,
         "source_chunks": [doc.page_content for doc in retrieved_docs],
+        "time": datetime.now().strftime("%I:%M %p"),  # e.g. "02:47 PM"
     })
+    
+for entry in st.session_state.chat_history:
+    with st.chat_message("user"):
+        st.write(entry["question"])
+        st.caption(entry.get("time", ""))   # ← add this line
+    with st.chat_message("assistant"):
+        st.write(entry["answer"])
+        with st.expander("📚 Source chunks used"):
+            for i, chunk in enumerate(entry["source_chunks"]):
+                st.markdown(f"**Chunk {i + 1}:**")
+                st.caption(chunk[:400] + ("..." if len(chunk) > 400 else ""))
